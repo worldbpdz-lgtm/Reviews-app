@@ -1,7 +1,7 @@
 // prisma/schema.prisma
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url = env("DATABASE_URL")
 }
 
 generator client {
@@ -32,21 +32,34 @@ model Session {
 
 /* Your reviews table (example – keep what you already have) */
 model Review {
-  id            String   @id @default(cuid())
-  shopDomain    String
-  productId     BigInt
-  productHandle String?
-  rating        Int
-  title         String?
-  body          String
-  authorName    String
-  authorEmail   String?
-  status        ReviewStatus
-  createdAt     DateTime @default(now())
+  id             String   @id @default(cuid())
+  shopDomain     String
+  productId      BigInt
+  productHandle  String?
+  rating         Int
+  title          String?
+  body           String
+
+  // First name only (what you called “Name” in the form)
+  authorName     String
+
+  // Family name (optional)
+  authorLastName String?
+
+  // Optional email
+  authorEmail    String?
+
+  // Optional media (we can later split into image/video if needed)
+  mediaUrl       String?
+
+  status         ReviewStatus
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 enum ReviewStatus {
   pending
   approved
-  rejected
+  trashed   // replaces `rejected`
 }
+

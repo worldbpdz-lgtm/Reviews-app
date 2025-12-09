@@ -1,8 +1,8 @@
 # shopify.app.toml
 
-client_id = "f0f95783e7e83196033adcb1d71cd52e"
-name = "ReviewForge"
-application_url = "https://review-app-seven-gamma.vercel.app"
+client_id = "cfebcb69b0f03073c03b3a24444679c6"
+name = "review-forge"
+application_url = "https://example.com"  # placeholder, CLI overrides in dev
 embedded = true
 
 [build]
@@ -24,10 +24,13 @@ api_version = "2025-10"
 scopes = "read_products,write_products,read_metaobjects,write_metaobjects"
 
 [auth]
-redirect_urls = ["https://review-app-seven-gamma.vercel.app/auth/callback"]
+# For dev, Shopify CLI will override this in the Partner dashboard,
+# but we keep a sensible placeholder for later.
+redirect_urls = ["https://example.com/auth/callback"]
 
 [app_proxy]
-# IMPORTANT: This must be the *base* proxy URL, not the full /reviews path.
-url = "https://review-app-seven-gamma.vercel.app/api/proxy"
+# This MUST be the *base* URL (without /reviews).
+# For dev, CLI overrides it in the Partner app config, but we define a placeholder.
+url = "https://example.com/api/proxy"
 prefix = "apps"
 subpath = "reviews"

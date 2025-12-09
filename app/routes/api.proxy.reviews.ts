@@ -1,7 +1,6 @@
 // app/routes/api.proxy.reviews.ts
-import { PrismaClient, ReviewStatus } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import prisma from "../db.server";
+import { ReviewStatus } from "@prisma/client";
 
 /** Read JSON or form-encoded bodies */
 async function readBody(request: Request) {
@@ -35,6 +34,7 @@ function handleOptions(request: Request) {
       status: 204,
       headers: {
         "Access-Control-Allow-Origin": "*",
+        "Access-Control-Expose-Headers": "Content-Type",
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
       },
@@ -64,7 +64,11 @@ function getShopFromRequest(request: Request): string | undefined {
 }
 
 /**
- * GET /apps/<proxy>/reviews?product_id=...&status=approved
+ * GET /apps/<proxy>/reviews
+ *
+ * - /apps/reviews?product_id=123            → reviews for that product
+ * - /apps/reviews                           → all reviews for the shop
+ * - /apps/reviews?status=pending            → filter by status
  */
 export async function loader({ request }: { request: Request }) {
   const maybeCors = handleOptions(request);
@@ -84,30 +88,38 @@ export async function loader({ request }: { request: Request }) {
     }
 
     const url = new URL(request.url);
+
     const productIdRaw =
       url.searchParams.get("product_id") ??
       url.searchParams.get("productId") ??
-      "";
-    if (!productIdRaw) {
-      return safeJson({ ok: false, error: "Missing product_id" }, { status: 400 });
-    }
+      null;
 
-    let pid: bigint;
-    try {
-      pid = BigInt(String(productIdRaw));
-    } catch {
-      return safeJson({ ok: false, error: "Invalid product_id" }, { status: 400 });
+    let pid: bigint | null = null;
+    if (productIdRaw) {
+      try {
+        pid = BigInt(String(productIdRaw));
+      } catch {
+        return safeJson(
+          { ok: false, error: "Invalid product_id" },
+          { status: 400 }
+        );
+      }
     }
 
     const statusParam =
       (url.searchParams.get("status") ?? "approved") as keyof typeof ReviewStatus;
 
+    const where: any = {
+      shopDomain: shop,
+      status: ReviewStatus[statusParam] ?? ReviewStatus.approved,
+    };
+
+    if (pid !== null) {
+      where.productId = pid;
+    }
+
     const reviews = await prisma.review.findMany({
-      where: {
-        shopDomain: shop,
-        productId: pid,
-        status: ReviewStatus[statusParam] ?? ReviewStatus.approved,
-      },
+      where,
       orderBy: { createdAt: "desc" },
       take: 50,
     });
@@ -115,7 +127,10 @@ export async function loader({ request }: { request: Request }) {
     return safeJson({ ok: true, reviews }, { status: 200 });
   } catch (err) {
     console.error("GET /reviews error:", err);
-    return safeJson({ ok: false, error: "Failed to load reviews" }, { status: 500 });
+    return safeJson(
+      { ok: false, error: "Failed to load reviews" },
+      { status: 500 }
+    );
   }
 }
 
@@ -127,7 +142,10 @@ export async function action({ request }: { request: Request }) {
   if (maybeCors) return maybeCors;
 
   if (request.method !== "POST") {
-    return safeJson({ ok: false, error: "Method not allowed" }, { status: 405 });
+    return safeJson(
+      { ok: false, error: "Method not allowed" },
+      { status: 405 }
+    );
   }
 
   try {
@@ -145,28 +163,64 @@ export async function action({ request }: { request: Request }) {
 
     const body = await readBody(request);
 
-    // Normalize inputs
+    // Normalize inputs (support multiple naming styles)
     const productIdRaw = body.productId ?? body.product_id;
     const ratingRaw = body.rating;
     const title = body.title ? String(body.title) : null;
+
+    // First name
+    const firstName =
+      body.firstName ??
+      body.name ??
+      body.author_name ??
+      "";
+
+    // Family name (optional)
+    const lastName =
+      body.lastName ??
+      body.family_name ??
+      body.last_name ??
+      null;
+
+    // Optional email
+    const authorEmail =
+      body.email ??
+      body.author_email ??
+      null;
+
+    // Review text
     const text =
       body.body !== undefined
         ? String(body.body)
         : body.review !== undefined
         ? String(body.review)
         : "";
-    const authorName = body.author_name ? String(body.author_name) : "";
-    const authorEmail = body.author_email ? String(body.author_email) : null;
-    const productHandle = body.product_handle ? String(body.product_handle) : null;
+
+    // Optional media URL
+    const mediaUrl =
+      body.mediaUrl ??
+      body.media_url ??
+      null;
+
+    const productHandle = body.product_handle
+      ? String(body.product_handle)
+      : null;
 
     if (!productIdRaw) {
-      return safeJson({ ok: false, error: "product_id is required" }, { status: 400 });
+      return safeJson(
+        { ok: false, error: "product_id is required" },
+        { status: 400 }
+      );
     }
+
     let pid: bigint;
     try {
       pid = BigInt(String(productIdRaw));
     } catch {
-      return safeJson({ ok: false, error: "Invalid product_id" }, { status: 400 });
+      return safeJson(
+        { ok: false, error: "Invalid product_id" },
+        { status: 400 }
+      );
     }
 
     const rating = Number(ratingRaw);
@@ -176,9 +230,10 @@ export async function action({ request }: { request: Request }) {
         { status: 400 }
       );
     }
-    if (!authorName || !text) {
+
+    if (!firstName || !text) {
       return safeJson(
-        { ok: false, error: "author_name and body are required" },
+        { ok: false, error: "name and review body are required" },
         { status: 400 }
       );
     }
@@ -191,8 +246,10 @@ export async function action({ request }: { request: Request }) {
         rating,
         title,
         body: text,
-        authorName,
+        authorName: String(firstName),
+        authorLastName: lastName ? String(lastName) : null,
         authorEmail,
+        mediaUrl,
         status: ReviewStatus.pending,
       },
     });
@@ -200,6 +257,9 @@ export async function action({ request }: { request: Request }) {
     return safeJson({ ok: true, review: created }, { status: 200 });
   } catch (err) {
     console.error("POST /reviews error:", err);
-    return safeJson({ ok: false, error: "Failed to submit review" }, { status: 500 });
+    return safeJson(
+      { ok: false, error: "Failed to submit review" },
+      { status: 500 }
+    );
   }
 }
