@@ -84,7 +84,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       data: { status: ReviewStatus.pending },
     });
   } else if (intent === "delete") {
-    // NEW: hard delete instead of moving to trashed
+    // Hard delete instead of moving to trashed
     await prisma.review.delete({
       where: { id },
     });
@@ -92,10 +92,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return new Response("Unknown intent", { status: 400 });
   }
 
-  // Let React Router revalidate loader data
-  return new Response(JSON.stringify({ ok: true }), {
-    headers: { "Content-Type": "application/json" },
-  });
+  // 204 = no body + triggers loader revalidation cleanly
+  return new Response(null, { status: 204 });
 };
 
 /* -------------------- CLIENT COMPONENT -------------------- */
@@ -181,10 +179,14 @@ export default function ReviewsIndex() {
                             name="intent"
                             value="approve"
                           />
-                          <s-button variant="primary">Approve</s-button>
+                          <s-button
+                            type="submit"
+                            variant="primary"
+                          >
+                            Approve
+                          </s-button>
                         </fetcher.Form>
 
-                        {/* UPDATED: delete + red button */}
                         <fetcher.Form method="post">
                           <input type="hidden" name="id" value={review.id} />
                           <input
@@ -193,6 +195,7 @@ export default function ReviewsIndex() {
                             value="delete"
                           />
                           <s-button
+                            type="submit"
                             variant="tertiary"
                             tone="critical"
                           >
@@ -203,8 +206,40 @@ export default function ReviewsIndex() {
                     )}
 
                     {status === "approved" && (
+                      <fetcher.Form method="post">
+                        <input type="hidden" name="id" value={review.id} />
+                        <input
+                          type="hidden"
+                          name="intent"
+                          value="delete"
+                        />
+                        <s-button
+                          type="submit"
+                          variant="tertiary"
+                          tone="critical"
+                        >
+                          Move to corbeille
+                        </s-button>
+                      </fetcher.Form>
+                    )}
+
+                    {status === "trashed" && (
                       <>
-                        {/* Only delete (corbeille) from approved */}
+                        <fetcher.Form method="post">
+                          <input type="hidden" name="id" value={review.id} />
+                          <input
+                            type="hidden"
+                            name="intent"
+                            value="restore"
+                          />
+                          <s-button
+                            type="submit"
+                            variant="primary"
+                          >
+                            Restore
+                          </s-button>
+                        </fetcher.Form>
+
                         <fetcher.Form method="post">
                           <input type="hidden" name="id" value={review.id} />
                           <input
@@ -213,36 +248,9 @@ export default function ReviewsIndex() {
                             value="delete"
                           />
                           <s-button
-                            variant="tertiary"
+                            type="submit"
                             tone="critical"
                           >
-                            Move to corbeille
-                          </s-button>
-                        </fetcher.Form>
-                      </>
-                    )}
-
-                    {status === "trashed" && (
-                      <>
-                        {/* If you ever have trashed items from earlier code, you can still restore or delete them */}
-                        <fetcher.Form method="post">
-                          <input type="hidden" name="id" value={review.id} />
-                          <input
-                            type="hidden"
-                            name="intent"
-                            value="restore"
-                          />
-                          <s-button variant="primary">Restore</s-button>
-                        </fetcher.Form>
-
-                        <fetcher.Form method="post">
-                          <input type="hidden" name="id" value={review.id} />
-                          <input
-                            type="hidden"
-                            name="intent"
-                            value="delete"
-                          />
-                          <s-button tone="critical">
                             Delete permanently
                           </s-button>
                         </fetcher.Form>
