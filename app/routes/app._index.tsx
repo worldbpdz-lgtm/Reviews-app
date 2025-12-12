@@ -77,11 +77,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       where: { id },
       data: { status: ReviewStatus.approved },
     });
-  } else if (intent === "trash") {
-    await prisma.review.update({
-      where: { id },
-      data: { status: ReviewStatus.trashed },
-    });
   } else if (intent === "restore") {
     // Back to pending; you can approve again later
     await prisma.review.update({
@@ -89,6 +84,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       data: { status: ReviewStatus.pending },
     });
   } else if (intent === "delete") {
+    // NEW: hard delete instead of moving to trashed
     await prisma.review.delete({
       where: { id },
     });
@@ -163,9 +159,7 @@ export default function ReviewsIndex() {
                   <s-stack direction="inline" gap="base">
                     <s-text>{formatDisplayName(review)}</s-text>
                     <s-badge tone="info">{review.rating} ★</s-badge>
-                    <s-text>
-                      Product ID: {review.productId}
-                    </s-text>
+                    <s-text>Product ID: {review.productId}</s-text>
                     {review.productHandle && (
                       <s-text>Handle: {review.productHandle}</s-text>
                     )}
@@ -187,15 +181,21 @@ export default function ReviewsIndex() {
                             name="intent"
                             value="approve"
                           />
-                          <s-button variant="primary">
-                            Approve
-                          </s-button>
+                          <s-button variant="primary">Approve</s-button>
                         </fetcher.Form>
 
+                        {/* UPDATED: delete + red button */}
                         <fetcher.Form method="post">
                           <input type="hidden" name="id" value={review.id} />
-                          <input type="hidden" name="intent" value="trash" />
-                          <s-button variant="tertiary">
+                          <input
+                            type="hidden"
+                            name="intent"
+                            value="delete"
+                          />
+                          <s-button
+                            variant="tertiary"
+                            tone="critical"
+                          >
                             Move to corbeille
                           </s-button>
                         </fetcher.Form>
@@ -203,17 +203,28 @@ export default function ReviewsIndex() {
                     )}
 
                     {status === "approved" && (
-                      <fetcher.Form method="post">
-                        <input type="hidden" name="id" value={review.id} />
-                        <input type="hidden" name="intent" value="trash" />
-                        <s-button variant="tertiary">
-                          Move to corbeille
-                        </s-button>
-                      </fetcher.Form>
+                      <>
+                        {/* Only delete (corbeille) from approved */}
+                        <fetcher.Form method="post">
+                          <input type="hidden" name="id" value={review.id} />
+                          <input
+                            type="hidden"
+                            name="intent"
+                            value="delete"
+                          />
+                          <s-button
+                            variant="tertiary"
+                            tone="critical"
+                          >
+                            Move to corbeille
+                          </s-button>
+                        </fetcher.Form>
+                      </>
                     )}
 
                     {status === "trashed" && (
                       <>
+                        {/* If you ever have trashed items from earlier code, you can still restore or delete them */}
                         <fetcher.Form method="post">
                           <input type="hidden" name="id" value={review.id} />
                           <input
@@ -221,9 +232,7 @@ export default function ReviewsIndex() {
                             name="intent"
                             value="restore"
                           />
-                          <s-button variant="primary">
-                            Restore
-                          </s-button>
+                          <s-button variant="primary">Restore</s-button>
                         </fetcher.Form>
 
                         <fetcher.Form method="post">
