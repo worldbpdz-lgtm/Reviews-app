@@ -9,7 +9,9 @@ async function readBody(request: Request) {
   if (ct.includes("application/x-www-form-urlencoded")) {
     const form = await request.formData();
     const obj: Record<string, any> = {};
-    form.forEach((v, k) => (obj[k] = v));
+    form.forEach((v, k) => {
+      obj[k] = v;
+    });
     return obj;
   }
   try {
@@ -22,7 +24,9 @@ async function readBody(request: Request) {
 /** JSON that safely stringifies BigInt */
 function safeJson<T>(data: T, init?: ResponseInit) {
   return new Response(
-    JSON.stringify(data, (_k, v) => (typeof v === "bigint" ? v.toString() : v)),
+    JSON.stringify(data, (_k, v) =>
+      typeof v === "bigint" ? v.toString() : v
+    ),
     { headers: { "Content-Type": "application/json" }, ...init }
   );
 }
@@ -106,12 +110,16 @@ export async function loader({ request }: { request: Request }) {
       }
     }
 
-    const statusParam =
-      (url.searchParams.get("status") ?? "approved") as keyof typeof ReviewStatus;
+    const statusParam = (url.searchParams.get("status") ?? "approved") as
+      | keyof typeof ReviewStatus
+      | string;
+
+    const normalizedStatusKey =
+      statusParam in ReviewStatus ? (statusParam as keyof typeof ReviewStatus) : "approved";
 
     const where: any = {
       shopDomain: shop,
-      status: ReviewStatus[statusParam] ?? ReviewStatus.approved,
+      status: ReviewStatus[normalizedStatusKey],
     };
 
     if (pid !== null) {
@@ -121,7 +129,7 @@ export async function loader({ request }: { request: Request }) {
     const reviews = await prisma.review.findMany({
       where,
       orderBy: { createdAt: "desc" },
-      take: 50,
+      take: 200,
     });
 
     return safeJson({ ok: true, reviews }, { status: 200 });

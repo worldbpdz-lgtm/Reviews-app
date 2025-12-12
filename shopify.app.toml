@@ -2,7 +2,7 @@
 
 client_id = "cfebcb69b0f03073c03b3a24444679c6"
 name = "review-forge"
-application_url = "https://example.com"  # placeholder, CLI overrides in dev
+application_url = "https://reviews-app-ecru.vercel.app"
 embedded = true
 
 [build]
@@ -25,12 +25,12 @@ scopes = "read_products,write_products,read_metaobjects,write_metaobjects"
 
 [auth]
 # For dev, Shopify CLI will override this in the Partner dashboard,
-# but we keep a sensible placeholder for later.
-redirect_urls = ["https://example.com/auth/callback"]
+# but for production we want the real URL here.
+redirect_urls = ["https://reviews-app-ecru.vercel.app/auth/callback"]
 
 [app_proxy]
 # This MUST be the *base* URL (without /reviews).
-# For dev, CLI overrides it in the Partner app config, but we define a placeholder.
-url = "https://example.com/api/proxy"
+# Matches our Remix redirect in app/routes/api.proxy.ts
+url = "https://reviews-app-ecru.vercel.app/api/proxy"
 prefix = "apps"
 subpath = "reviews"
