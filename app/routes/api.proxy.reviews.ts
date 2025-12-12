@@ -2,32 +2,35 @@
 import prisma from "../db.server";
 import { ReviewStatus } from "@prisma/client";
 
-/** Read JSON or form-encoded bodies */
-async function readBody(request: Request) {
-  const ct = request.headers.get("content-type") || "";
-  if (ct.includes("application/json")) return request.json();
-  if (ct.includes("application/x-www-form-urlencoded")) {
-    const form = await request.formData();
-    const obj: Record<string, any> = {};
-    form.forEach((v, k) => {
-      obj[k] = v;
-    });
-    return obj;
-  }
-  try {
-    return await request.json();
-  } catch {
-    return {};
-  }
-}
+// ---------- CORS helpers ----------
 
-/** JSON that safely stringifies BigInt */
+const CORS_HEADERS: Record<string, string> = {
+  // In dev, "*" is fine. In production you can restrict this if you want.
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Expose-Headers": "Content-Type",
+};
+
+/** JSON that safely stringifies BigInt and always includes CORS headers */
 function safeJson<T>(data: T, init?: ResponseInit) {
+  const headers = new Headers(init?.headers);
+
+  // Make sure JSON content type is set
+  if (!headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  // Add CORS headers
+  for (const [key, value] of Object.entries(CORS_HEADERS)) {
+    headers.set(key, value);
+  }
+
   return new Response(
     JSON.stringify(data, (_k, v) =>
       typeof v === "bigint" ? v.toString() : v
     ),
-    { headers: { "Content-Type": "application/json" }, ...init }
+    { ...init, headers }
   );
 }
 
@@ -36,15 +39,36 @@ function handleOptions(request: Request) {
   if (request.method === "OPTIONS") {
     return new Response(null, {
       status: 204,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Expose-Headers": "Content-Type",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      },
+      headers: CORS_HEADERS,
     });
   }
   return null;
+}
+
+// ---------- Body / shop helpers ----------
+
+/** Read JSON or form-encoded bodies */
+async function readBody(request: Request) {
+  const ct = request.headers.get("content-type") || "";
+
+  if (ct.includes("application/json")) {
+    return request.json();
+  }
+
+  if (ct.includes("application/x-www-form-urlencoded")) {
+    const form = await request.formData();
+    const obj: Record<string, any> = {};
+    form.forEach((v, k) => {
+      obj[k] = v;
+    });
+    return obj;
+  }
+
+  try {
+    return await request.json();
+  } catch {
+    return {};
+  }
 }
 
 /** Try to resolve the shop domain from header, query, or hostname */
@@ -66,6 +90,8 @@ function getShopFromRequest(request: Request): string | undefined {
 
   return undefined;
 }
+
+// ---------- GET: list reviews ----------
 
 /**
  * GET /apps/<proxy>/reviews
@@ -115,7 +141,9 @@ export async function loader({ request }: { request: Request }) {
       | string;
 
     const normalizedStatusKey =
-      statusParam in ReviewStatus ? (statusParam as keyof typeof ReviewStatus) : "approved";
+      statusParam in ReviewStatus
+        ? (statusParam as keyof typeof ReviewStatus)
+        : "approved";
 
     const where: any = {
       shopDomain: shop,
@@ -141,6 +169,8 @@ export async function loader({ request }: { request: Request }) {
     );
   }
 }
+
+// ---------- POST: create review ----------
 
 /**
  * POST /apps/<proxy>/reviews

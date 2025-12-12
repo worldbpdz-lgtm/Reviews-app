@@ -6,8 +6,7 @@ application_url = "https://reviews-app-ecru.vercel.app"
 embedded = true
 
 [build]
-automatically_update_urls_on_dev = true
-include_config_on_deploy = true
+automatically_update_urls_on_dev = false
 
 [webhooks]
 api_version = "2025-10"
@@ -24,13 +23,9 @@ api_version = "2025-10"
 scopes = "read_products,write_products,read_metaobjects,write_metaobjects"
 
 [auth]
-# For dev, Shopify CLI will override this in the Partner dashboard,
-# but for production we want the real URL here.
 redirect_urls = ["https://reviews-app-ecru.vercel.app/auth/callback"]
 
 [app_proxy]
-# This MUST be the *base* URL (without /reviews).
-# Matches our Remix redirect in app/routes/api.proxy.ts
 url = "https://reviews-app-ecru.vercel.app/api/proxy"
 prefix = "apps"
 subpath = "reviews"
