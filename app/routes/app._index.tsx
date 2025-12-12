@@ -83,8 +83,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       where: { id },
       data: { status: ReviewStatus.pending },
     });
+  } else if (intent === "trash") {
+    // Move to corbeille (soft delete)
+    await prisma.review.update({
+      where: { id },
+      data: { status: ReviewStatus.trashed },
+    });
   } else if (intent === "delete") {
-    // Hard delete instead of moving to trashed
+    // Hard delete (from corbeille)
     await prisma.review.delete({
       where: { id },
     });
@@ -170,6 +176,7 @@ export default function ReviewsIndex() {
                   )}
 
                   <s-stack direction="inline" gap="base">
+                    {/* PENDING tab */}
                     {status === "pending" && (
                       <>
                         <fetcher.Form method="post">
@@ -187,42 +194,46 @@ export default function ReviewsIndex() {
                           </s-button>
                         </fetcher.Form>
 
+                        {/* Soft delete → Corbeille */}
                         <fetcher.Form method="post">
                           <input type="hidden" name="id" value={review.id} />
                           <input
                             type="hidden"
                             name="intent"
-                            value="delete"
+                            value="trash"
                           />
                           <s-button
                             type="submit"
-                            variant="tertiary"
+                            variant="primary"
                             tone="critical"
                           >
-                            Move to corbeille
+                            Delete
                           </s-button>
                         </fetcher.Form>
                       </>
                     )}
 
+                    {/* APPROVED tab */}
                     {status === "approved" && (
                       <fetcher.Form method="post">
                         <input type="hidden" name="id" value={review.id} />
+                        {/* Soft delete → Corbeille */}
                         <input
                           type="hidden"
                           name="intent"
-                          value="delete"
+                          value="trash"
                         />
                         <s-button
                           type="submit"
-                          variant="tertiary"
+                          variant="primary"
                           tone="critical"
                         >
-                          Move to corbeille
+                          Delete
                         </s-button>
                       </fetcher.Form>
                     )}
 
+                    {/* CORBEILLE tab */}
                     {status === "trashed" && (
                       <>
                         <fetcher.Form method="post">
@@ -242,6 +253,7 @@ export default function ReviewsIndex() {
 
                         <fetcher.Form method="post">
                           <input type="hidden" name="id" value={review.id} />
+                          {/* Hard delete from Corbeille */}
                           <input
                             type="hidden"
                             name="intent"
@@ -249,6 +261,7 @@ export default function ReviewsIndex() {
                           />
                           <s-button
                             type="submit"
+                            variant="primary"
                             tone="critical"
                           >
                             Delete permanently
