@@ -2,6 +2,8 @@
 import prisma from "../db.server";
 import { ReviewStatus } from "@prisma/client";
 import { createClient } from "@supabase/supabase-js";
+import { randomUUID } from "node:crypto";
+
 
 // ---------- Supabase ----------
 const SUPABASE_URL = process.env.SUPABASE_URL || "";
@@ -282,11 +284,11 @@ export async function action({ request }: { request: Request }) {
       const safeExt = ext.replace(/[^a-z0-9]/g, "") || "bin";
 
       // Example: reviews/shop.myshopify.com/1234567890/<random>.jpg
-      const path = `reviews/${shop}/${productIdRaw}/${crypto.randomUUID()}.${safeExt}`;
+      const path = `reviews/${shop}/${productIdRaw}/${randomUUID()}.${safeExt}`;
 
-      const buf = Buffer.from(await uploadedFile.arrayBuffer());
+      const bytes = new Uint8Array(await uploadedFile.arrayBuffer());
 
-      const { error: upErr } = await supabase.storage.from(SUPABASE_BUCKET).upload(path, buf, {
+      const { error: upErr } = await supabase.storage.from(SUPABASE_BUCKET).upload(path, bytes, {
         contentType: uploadedFile.type || "application/octet-stream",
         upsert: false,
       });
